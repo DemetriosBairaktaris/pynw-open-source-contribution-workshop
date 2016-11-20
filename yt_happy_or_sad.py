@@ -1,18 +1,32 @@
+from colorama import init
+from colorama import deinit
+from colorama import Fore
+from bs4 import BeautifulSoup
 import argparse
 import requests
-from bs4 import BeautifulSoup
+import re
 
-COMMENTS_API_URL = 'https://plus.googleapis.com/u/0/_/widget/render/comments?first_party_property=YOUTUBE&href={video_url}'
-HAPPY_WORDS = set(['love','loved','like','liked','awesome','amazing','good','great','excellent'])
-SAD_WORDS = set(['hate','hated','dislike','disliked','awful','terrible','bad','painful','worst'])
+youtubeURLRegex = re.compile(r'https://youtube.com/watch\?v=\S+')
+RED, GREEN = Fore.RED, Fore.GREEN
+COMMENTS_API_URL = ("https://plus.googleapis.com/" +
+                    "u/0/_/widget/render/comments?" +
+                    "first_party_property=YOUTUBE&href={video_url}")
+HAPPY_WORDS = ({'love', 'loved', 'like',
+                'liked', 'awesome', 'amazing',
+                'good', 'great', 'excellent'})
+SAD_WORDS = ({'hate', 'hated', 'dislike',
+              'disliked', 'awful', 'terrible',
+              'bad', 'painful', 'worst'})
 
 
 def scrape_video_comments(video_url):
     """Scrape the comments from a Youtube video and return them as a list."""
     response = requests.get(COMMENTS_API_URL.format(video_url=video_url))
+    print(COMMENTS_API_URL.format(video_url=video_url))
     soup = BeautifulSoup(response.content, "html.parser")
     comments = soup.findAll('div', {'class': 'Ct'})
-    comments = [comment.text for comment in comments if comment not in ['', ' ']]
+    comments = ([comment.text for comment in comments
+                if comment not in ['', ' ']])
     return comments
 
 
@@ -35,15 +49,25 @@ def happy_or_sad(video_url):
         happy_word_count, sad_word_count = happy_or_sad_comment(comment)
         happy_count += happy_word_count
         sad_count += sad_word_count
-    
     verdict = 'Happy' if happy_count > sad_count else 'Sad'
-    print('From a sample size of {no_comments} comments, the responses to this video are mostly {verdict}. '
-          'It contained {happy_count} happy keywords and {sad_count} sad keywords'
-          .format(no_comments=len(comments), verdict=verdict, happy_count=happy_count, sad_count=sad_count))
+    color = {"Happy": GREEN, "Sad": RED}
+    print(color[verdict]+'From a sample size of {no_comments} comments,'
+          ' the responses to this video are mostly {verdict}. '
+          'It contained {happy_count} happy keywords'
+          ' and {sad_count} sad keywords'
+          .format(no_comments=len(comments),
+                  verdict=verdict,
+                  happy_count=happy_count,
+                  sad_count=sad_count))
 
 
 if __name__ == '__main__':
+    init()
     parser = argparse.ArgumentParser(description='Youtube video happy or sad')
     parser.add_argument('url', metavar='URL', help='URL of Youtube video')
     args = parser.parse_args()
+    if not(len(youtubeURLRegex.findall(args.url)) >= 1):
+        raise argparse.ArgumentTypeError(RED+"URL must be in form: "
+                                         "https://youtube.com/watch?v=XXXXXXX")
     happy_or_sad(args.url)
+    deinit()
